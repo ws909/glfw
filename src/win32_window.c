@@ -42,6 +42,14 @@
 #define DWMWA_USE_IMMERSIVE_DARK_MODE 20
 #endif
 
+#ifndef DWMWA_BORDER_COLOR
+#define DWMWA_BORDER_COLOR 34
+#endif
+
+#ifndef DWMWA_CAPTION_COLOR
+#define DWMWA_CAPTION_COLOR 35
+#endif
+
 // Apply the system default theme
 //
 static void applySystemTheme(HWND handle)
@@ -56,7 +64,8 @@ static void applySystemTheme(HWND handle)
     }
 }
 
-
+// Get the system accent color
+//
 static int getAccentColor(float color[4])
 {
     if (!_glfw.win32.uxtheme.uxThemeAvailable)
@@ -65,16 +74,40 @@ static int getAccentColor(float color[4])
     UINT dwImmersiveColorType = _glfw.win32.uxtheme.GetImmersiveColorTypeFromName(L"ImmersiveSystemAccent");
     UINT dwImmersiveColorSet = _glfw.win32.uxtheme.GetImmersiveUserColorSetPreference(FALSE, FALSE);
 
-    UINT rgba = _glfw.win32.uxtheme.GetImmersiveColorFromColorSetEx(dwImmersiveColorSet,
+    UINT abgr = _glfw.win32.uxtheme.GetImmersiveColorFromColorSetEx(dwImmersiveColorSet,
                                                                     dwImmersiveColorType,
                                                                     FALSE,
                                                                     0);
 
-    color[0] = (float) (0xFF & rgba);
-    color[1] = (float) ((0xFF00 & rgba) >> 8);
-    color[2] = (float) ((0xFF0000 & rgba) >> 16);
-    color[3] = (float) ((0xFF000000 & rgba) >> 24);
+    // color is in RGBA
+    color[0] = (float) (0xFF & abgr) / 255.f;
+    color[1] = (float) ((0xFF00 & abgr) >> 8) / 255.f;
+    color[2] = (float) ((0xFF0000 & abgr) >> 16) / 255.f;
+    color[3] = (float) ((0xFF000000 & abgr) >> 24) / 255.f;
     
+    return GLFW_TRUE;
+}
+
+// Set a custom accent color for a window
+//
+static int setAccentColor(HWND handle, const float color[4])
+{
+    if (!_glfw.win32.uxtheme.uxThemeAvailable)
+        return GLFW_FALSE;
+
+    // The alpha should be left as zero, otherwise it won't work
+    COLORREF accentColor = (((UINT) (color[2] * 255)) << 16) | (((UINT) (color[1] * 255)) << 8) | ((UINT) (color[0] * 255));
+
+    DwmSetWindowAttribute(
+            handle, DWMWA_BORDER_COLOR,
+            &accentColor, sizeof(accentColor)
+    );
+
+    DwmSetWindowAttribute(
+            handle, DWMWA_CAPTION_COLOR,
+            &accentColor, sizeof(accentColor)
+    );
+
     return GLFW_TRUE;
 }
 
