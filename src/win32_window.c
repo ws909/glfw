@@ -50,6 +50,9 @@
 #define DWMWA_CAPTION_COLOR 35
 #endif
 
+// Use this constant to reset any window part colors to the system default behavior
+#define DWMWA_COLOR_DEFAULT 0xFFFFFFFF
+
 // Apply the system default theme
 //
 static void applySystemTheme(HWND handle)
@@ -97,6 +100,29 @@ static int setAccentColor(HWND handle, const float color[4])
 
     // The alpha should be left as zero, otherwise it won't work
     COLORREF accentColor = (((UINT) (color[2] * 255)) << 16) | (((UINT) (color[1] * 255)) << 8) | ((UINT) (color[0] * 255));
+
+    DwmSetWindowAttribute(
+            handle, DWMWA_BORDER_COLOR,
+            &accentColor, sizeof(accentColor)
+    );
+
+    DwmSetWindowAttribute(
+            handle, DWMWA_CAPTION_COLOR,
+            &accentColor, sizeof(accentColor)
+    );
+
+    return GLFW_TRUE;
+}
+
+// Reset the accent color to system default for a window
+//
+static int resetAccentColor(HWND handle)
+{
+    if (!_glfw.win32.uxtheme.uxThemeAvailable)
+        return GLFW_FALSE;
+
+    // The alpha should be left as zero, otherwise it won't work
+    COLORREF accentColor = DWMWA_COLOR_DEFAULT;
 
     DwmSetWindowAttribute(
             handle, DWMWA_BORDER_COLOR,
