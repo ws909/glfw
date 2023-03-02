@@ -350,6 +350,21 @@ static void createKeyTables(void)
     }
 }
 
+void _glfwGetSystemThemeWin32(_GLFWtheme* theme)
+{
+    theme->variation = GLFW_THEME_LIGHT;
+    theme->flags = 0;
+
+    if (_glfw.win32.uxtheme.uxThemeAvailable && _glfw.win32.uxtheme.darkTitleAvailable) {
+        if (_glfw.win32.uxtheme.ShouldAppsUseDarkMode() & 0x1) {
+            theme->variation = GLFW_THEME_DARK;
+        }
+    }
+    
+    if (getAccentColor(theme->color))
+        theme->flags |= GLFW_THEME_COLOR_MAIN;
+}
+
 // Window procedure for the hidden helper window
 //
 static LRESULT CALLBACK helperWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -379,6 +394,21 @@ static LRESULT CALLBACK helperWindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
             }
 
             break;
+        }
+        case WM_THEMECHANGED:
+        case WM_SETTINGCHANGE: // FIXME: does this even work?
+        {
+            _GLFWtheme theme;
+            _glfwGetSystemThemeWin32(&theme);
+        
+            if (glfwThemeEqual((GLFWtheme*) &theme, (GLFWtheme*) &_glfw.theme))
+                return;
+            
+            memcpy(&_glfw.theme, &theme, sizeof(_GLFWtheme));
+            _glfwInputSystemTheme(&theme);
+            
+            // FIXME: Or break? The goal is to not let an application-wide WM_SETTINGCHANGE or WM_THEMECHANGED get swallowed here.
+            return DefWindowProcW(hWnd, uMsg, wParam, lParam);
         }
     }
 
@@ -757,15 +787,8 @@ void _glfwTerminateWin32(void)
 _GLFWtheme* _glfwGetSystemDefaultThemeWin32(void)
 {
     _GLFWtheme* theme = &_glfw.theme;
-
-    theme->variation = GLFW_THEME_LIGHT;
-    theme->flags = 0;
-
-    if (_glfw.win32.uxtheme.uxThemeAvailable && _glfw.win32.uxtheme.darkTitleAvailable) {
-        if (_glfw.win32.uxtheme.ShouldAppsUseDarkMode() & 0x1) {
-            theme->variation = GLFW_THEME_DARK;
-        }
-    }
+    
+    _glfwGetSystemThemeWin32(theme);
 
     return theme;
 }

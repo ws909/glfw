@@ -91,6 +91,7 @@ static int getAccentColor(float color[4])
     return GLFW_TRUE;
 }
 
+// FIXME: According to the documentation: "The app is responsible for changing the border color according to state changes, such as a change in window activation." How can GLFW handle that?
 // Set a custom accent color for a window
 //
 static int setAccentColor(HWND handle, const float color[4])
@@ -2507,15 +2508,17 @@ void _glfwSetThemeWin32(_GLFWwindow* window, const _GLFWtheme* theme)
                               sizeof(darkMode));
     }
     
-    // TODO: set accent color
+    if (newTheme->flags & GLFW_THEME_COLOR_MAIN)
+        setAccentColor(window->win32.handle, newTheme->color);
+    else
+        resetAccentColor(window->win32.handle);
     
     memcpy(currentTheme, &newTheme, sizeof(_GLFWtheme));
     
     // Not available for setting in Win32.
     currentTheme->flags &= ~(GLFW_THEME_ATTRIBUTE_HIGH_CONTRAST |
                              GLFW_THEME_ATTRIBUTE_REDUCE_TRANSPARENCY |
-                             GLFW_THEME_ATTRIBUTE_REDUCE_MOTION|
-                             GLFW_THEME_COLOR_MAIN);
+                             GLFW_THEME_ATTRIBUTE_REDUCE_MOTION);
 }
 
 _GLFWtheme* _glfwGetThemeWin32(_GLFWwindow* window, int inlineDefaults)
