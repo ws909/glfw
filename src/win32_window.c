@@ -67,30 +67,6 @@ static void applySystemTheme(HWND handle)
     }
 }
 
-// Get the system accent color
-//
-static int getAccentColor(float color[4])
-{
-    if (!_glfw.win32.uxtheme.uxThemeAvailable)
-        return GLFW_FALSE;
-
-    UINT dwImmersiveColorType = _glfw.win32.uxtheme.GetImmersiveColorTypeFromName(L"ImmersiveSystemAccent");
-    UINT dwImmersiveColorSet = _glfw.win32.uxtheme.GetImmersiveUserColorSetPreference(FALSE, FALSE);
-
-    UINT abgr = _glfw.win32.uxtheme.GetImmersiveColorFromColorSetEx(dwImmersiveColorSet,
-                                                                    dwImmersiveColorType,
-                                                                    FALSE,
-                                                                    0);
-
-    // color is in RGBA
-    color[0] = (float) (0xFF & abgr) / 255.f;
-    color[1] = (float) ((0xFF00 & abgr) >> 8) / 255.f;
-    color[2] = (float) ((0xFF0000 & abgr) >> 16) / 255.f;
-    color[3] = (float) ((0xFF000000 & abgr) >> 24) / 255.f;
-    
-    return GLFW_TRUE;
-}
-
 // FIXME: According to the documentation: "The app is responsible for changing the border color according to state changes, such as a change in window activation." How can GLFW handle that?
 // Set a custom accent color for a window
 //
@@ -2508,8 +2484,8 @@ void _glfwSetThemeWin32(_GLFWwindow* window, const _GLFWtheme* theme)
                               sizeof(darkMode));
     }
     
-    if (newTheme->flags & GLFW_THEME_COLOR_MAIN)
-        setAccentColor(window->win32.handle, newTheme->color);
+    if (newTheme.flags & GLFW_THEME_COLOR_MAIN)
+        setAccentColor(window->win32.handle, newTheme.color);
     else
         resetAccentColor(window->win32.handle);
     
@@ -2539,7 +2515,7 @@ _GLFWtheme* _glfwGetThemeWin32(_GLFWwindow* window, int inlineDefaults)
     
     if ((theme->flags & GLFW_THEME_COLOR_MAIN) == 0)
     {
-        if (getAccentColor(theme->color))
+        if (_glfwGetSystemAccentColorWin32(theme->color))
             theme->flags |= GLFW_THEME_COLOR_MAIN;
         else
             memset(&theme->color, 0, sizeof(float) * 4);
