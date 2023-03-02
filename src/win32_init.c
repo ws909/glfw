@@ -352,7 +352,7 @@ static void createKeyTables(void)
 
 // Get the system accent color
 //
-static int _glfwGetSystemAccentColorWin32(float color[4])
+int _glfwGetSystemAccentColorWin32(float color[4])
 {
     if (!_glfw.win32.uxtheme.uxThemeAvailable)
         return GLFW_FALSE;
