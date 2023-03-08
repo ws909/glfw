@@ -110,7 +110,7 @@ void _glfwInitDBusPOSIX(void)
     {
         //Window NULL is safe here because it won't get
         //used inside the SetWindowTaskbarProgress function
-        _glfw.platform.setWindowTaskbarProgress(NULL, GLFW_PROGRESS_INDICATOR_DISABLED, 0);
+        _glfw.platform.setWindowProgressIndicator(NULL, GLFW_PROGRESS_INDICATOR_DISABLED, 0);
     }
 }
 
