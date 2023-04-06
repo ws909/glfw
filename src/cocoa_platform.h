@@ -37,6 +37,7 @@
 
 #if defined(__OBJC__)
 #import <Cocoa/Cocoa.h>
+#import <UserNotifications/UserNotifications.h>
 #else
 typedef void* id;
 #endif

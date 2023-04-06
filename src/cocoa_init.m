@@ -35,6 +35,10 @@
 // Needed for _NSGetProgname
 #include <crt_externs.h>
 
+//#import <UserNotifications/UserNotifications.h>
+//#include <UserNotifications/UserNotifications.h>
+//#import <UserNotificationsUI/UserNotificationsUI.h> // Maybe unnecessary
+
 // Change to our application bundle's resources directory, if present
 //
 static void changeToResourcesDirectory(void)
@@ -491,6 +495,161 @@ void* _glfwLoadLocalVulkanLoaderCocoa(void)
 //////                       GLFW platform API                      //////
 //////////////////////////////////////////////////////////////////////////
 
+@implementation NSBundle(swizzle)
+
+- (NSString *)glfwBundleIdentifier
+{
+    NSString* identifier = [self glfwBundleIdentifier];
+    
+    // Can potentially check for equality between the bundles' URLs too.
+    if (identifier == nil && self == [NSBundle mainBundle])
+        return @"org.glfw.window";
+    else
+        return identifier;
+}
+
+@end
+
+#import <objc/runtime.h>
+
+// TODO: remove at termination:
+static GLFWbool swizzleBundleIdentifier()
+{
+    Class class = objc_getClass("NSBundle");
+    
+    if (class)
+    {
+        // Is this actually just a toggle? Oh, in that case, 1 call in glfwInit + 1 call in glfwTerminate are enough. Or, a tracker in _glfw.
+        method_exchangeImplementations(class_getInstanceMethod(class, @selector(bundleIdentifier)),
+                                       class_getInstanceMethod(class, @selector(glfwBundleIdentifier)));
+        // This works, but probably causes problems if called in the wrong order.
+        /*
+        method_exchangeImplementations(class_getInstanceMethod(class, @selector(glfwBundleIdentifier)),
+                                       class_getInstanceMethod(class, @selector(bundleIdentifier)));
+         */
+        return GLFW_TRUE;
+    }
+    return GLFW_FALSE;
+}
+
+// Tests if the UNUserNotification is safe to use.
+// Calling into that framework may crash if this function returns false.
+//
+static GLFWbool notificationsEnabled()
+{
+    const NSBundle* bundle = [NSBundle mainBundle];
+    
+    if (!bundle)
+        return GLFW_FALSE;
+    
+    return [bundle bundleIdentifier] != nil ? GLFW_TRUE : GLFW_FALSE;
+}
+
+@interface NotificationsDelegate : NSObject <UNUserNotificationCenterDelegate>
+
+@end
+
+@implementation NotificationsDelegate
+
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+       willPresentNotification:(UNNotification *)notification
+         withCompletionHandler:(void (^)(UNNotificationPresentationOptions options))completionHandler
+{
+    completionHandler(UNNotificationPresentationOptionList |
+                      UNNotificationPresentationOptionBadge |
+                      UNNotificationPresentationOptionSound |
+                      UNNotificationPresentationOptionBanner);
+}
+@end
+
+void testNotifications()
+{
+    swizzleBundleIdentifier();
+    
+    const NSBundle* bundle = NSBundle.mainBundle;
+    printf("NSBundle: %s\n", bundle == nil ? "false" : "true");
+    NSLog(@"Identifier: %@", [bundle bundleIdentifier]);
+    NSLog(@"Path: %@", [bundle bundlePath]);
+    NSLog(@"URL: %@", [bundle bundleURL]);
+    
+    if (!notificationsEnabled())
+        printf("The bundle identifier is nil, so user notifications cannot be used. If this is the case, GLFW must not call into the UNUserNotifications framework at all!\n"); // Yeah, or do some swizzling
+    
+    // After building, add an identifier to the built application's info.plist, then rerun from the Finder (or CTRL + CMD + R)
+    
+    // TODO: there's two issues to solve:
+    // 1. Bundle identifier is nil: swizzling
+    // 2. GLFW is dynamically linked, so the application's bundle and GLFW's bundle are not the same.
+    
+    // FIXME: UNUserNotification does not work if the build is not signed!
+    // Ok, so then what causes the stupid rejection?
+    // Changing the info.plist makes the runtime validation of the code signing fail.
+    
+    // Notification permission requests do work when setting MACOSX_BUNDLE_GUI_IDENTIFIER in Examples/CMakeLists.txt or Tests/CMakeLists.txt
+    // This means that bundle identifier swizzling does not work! It requires reading it from the info.plist file! Why? Is it because it also reads something else there? Likely not. It probably has to do with signing? Or? Eh, who knows.
+    //
+    
+    
+    // TODO: The UN framework is asynchronous. GLFW is synchronous. How to solve that?
+    
+    UNUserNotificationCenter* notificationCenter = [UNUserNotificationCenter currentNotificationCenter];
+    notificationCenter.delegate = [[NotificationsDelegate alloc] init];
+    
+    id handler = ^(BOOL granted, NSError* error) {
+        printf("Permission %s\n", granted ? "allowed" : "declined");
+        if (error) {
+            NSLog(@"Permission error = %@ ", [error userInfo]);
+        }
+    };
+    
+    UNAuthorizationOptions permissions = UNAuthorizationOptionNone;
+    [notificationCenter requestAuthorizationWithOptions:permissions completionHandler:handler];
+    
+    permissions = UNAuthorizationOptionProvisional;
+    [notificationCenter requestAuthorizationWithOptions:permissions completionHandler:handler];
+    
+    permissions = UNAuthorizationOptionBadge;
+    [notificationCenter requestAuthorizationWithOptions:permissions completionHandler:handler];
+    
+    permissions = UNAuthorizationOptionBadge | UNAuthorizationOptionProvisional;
+    [notificationCenter requestAuthorizationWithOptions:permissions completionHandler:handler];
+    
+    permissions = UNAuthorizationOptionBadge | UNAuthorizationOptionSound | UNAuthorizationOptionAlert | UNAuthorizationOptionCarPlay | UNAuthorizationOptionCriticalAlert | UNAuthorizationOptionProvidesAppNotificationSettings | UNAuthorizationOptionProvisional;
+    [notificationCenter requestAuthorizationWithOptions:permissions completionHandler:handler];
+    
+    UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
+    content.title = @"My title";
+    content.body = @"My body";
+    content.categoryIdentifier = @"My category";
+    content.sound = UNNotificationSound.defaultSound;
+    
+    const UNNotificationCategory* category = [UNNotificationCategory categoryWithIdentifier:@"My category"
+                                                                                    actions:[NSArray array]
+                                                                          intentIdentifiers:[NSArray array]
+                                                              hiddenPreviewsBodyPlaceholder:@"My hidden body placeholder"
+                                                                      categorySummaryFormat:@"My summary format"
+                                                                                    options:UNNotificationCategoryOptionCustomDismissAction];
+    
+    UNNotificationRequest* request = [UNNotificationRequest requestWithIdentifier:@"My identifier" content:content trigger:nil];
+    
+    // FIXME: why is the application opened when not running, and the notification is dismissed from the notification center?
+    
+    [notificationCenter setNotificationCategories:[NSSet setWithObject:category]]; // Only call in glfwInit (or similar glfwInitNotifications), and in glfwTerminate.
+    [notificationCenter addNotificationRequest:request withCompletionHandler:^(NSError* error) {
+        if (error != nil) {
+            NSLog(@"Request error = %@", error);
+        }
+    }];
+    
+    printf("[HERE]\n");
+}
+
+static void _glfwSendNotificationCocoa(void)
+{
+    testNotifications();
+}
+
+
 GLFWbool _glfwConnectCocoa(int platformID, _GLFWplatform* platform)
 {
     const _GLFWplatform cocoa =
@@ -567,6 +726,7 @@ GLFWbool _glfwConnectCocoa(int platformID, _GLFWplatform* platform)
         _glfwGetRequiredInstanceExtensionsCocoa,
         _glfwGetPhysicalDevicePresentationSupportCocoa,
         _glfwCreateWindowSurfaceCocoa,
+        _glfwSendNotificationCocoa,
     };
 
     *platform = cocoa;
@@ -640,6 +800,9 @@ int _glfwInitCocoa(void)
     if (_glfw.hints.init.ns.menubar)
         [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
 
+        
+    testNotifications();
+        
     return GLFW_TRUE;
 
     } // autoreleasepool

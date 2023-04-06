@@ -549,3 +549,8 @@ GLFWAPI GLFWerrorfun glfwSetErrorCallback(GLFWerrorfun cbfun)
     return cbfun;
 }
 
+GLFWAPI void glfwSendNotification(void)
+{
+    // TODO: check init state
+    _glfw.platform.sendNotification();
+}

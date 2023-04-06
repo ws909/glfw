@@ -70,7 +70,7 @@ if (APPLE)
     set_target_properties(triangle-opengles PROPERTIES MACOSX_BUNDLE_BUNDLE_NAME "OpenGL ES Triangle")
     set_target_properties(splitview PROPERTIES MACOSX_BUNDLE_BUNDLE_NAME "SplitView")
     set_target_properties(wave PROPERTIES MACOSX_BUNDLE_BUNDLE_NAME "Wave")
-    set_target_properties(windows PROPERTIES MACOSX_BUNDLE_BUNDLE_NAME "Windows")
+    set_target_properties(windows PROPERTIES MACOSX_BUNDLE_BUNDLE_NAME "Windows" MACOSX_BUNDLE_GUI_IDENTIFIER "org.glfw.windows")
 
     set_source_files_properties(glfw.icns PROPERTIES
                                 MACOSX_PACKAGE_LOCATION "Resources")
