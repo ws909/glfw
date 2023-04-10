@@ -98,6 +98,7 @@ video tutorials.
  - IntellectualKitty
  - Aaron Jacobs
  - JannikGM
+ - Andreas O. Jansen
  - Erik S. V. Jansson
  - jjYBdx4IL
  - Toni Jovanoski
@@ -190,6 +191,7 @@ video tutorials.
  - Guillaume Racicot
  - Juan Ramos
  - Christian Rauch
+ - Simon Richter
  - Philip Rideout
  - Eddie Ringle
  - Max Risuhin
@@ -204,6 +206,7 @@ video tutorials.
  - Yoshinori Sano
  - Brandon Schaefer
  - Sebastian Schuberth
+ - Jan Schuerkamp
  - Christian Sdunek
  - Matt Sealey
  - Steve Sexton
