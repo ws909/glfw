@@ -755,7 +755,7 @@ struct _GLFWplatform
     GLFWbool (*getPhysicalDevicePresentationSupport)(VkInstance,VkPhysicalDevice,uint32_t);
     VkResult (*createWindowSurface)(VkInstance,_GLFWwindow*,const VkAllocationCallbacks*,VkSurfaceKHR*);
     // Notifications
-    void (*sendNotification)(void);
+    void (*sendNotification)(const char*,const char*,const char*);
 };
 
 // Library global data

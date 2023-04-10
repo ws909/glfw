@@ -6007,7 +6007,9 @@ GLFWAPI void glfwSetClipboardString(GLFWwindow* window, const char* string);
  */
 GLFWAPI const char* glfwGetClipboardString(GLFWwindow* window);
 
-GLFWAPI void glfwSendNotification();
+GLFWAPI void glfwSendNotification(const char* title,
+                                  const char* body,
+                                  const char* summary);
 
 /*! @brief Returns the GLFW time.
  *

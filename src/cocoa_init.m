@@ -562,16 +562,8 @@ static GLFWbool notificationsEnabled()
 }
 @end
 
-void testNotifications()
+static void _glfwSendNotificationCocoa(const char* title, const char* body, const char* summary)
 {
-    swizzleBundleIdentifier();
-    
-    const NSBundle* bundle = NSBundle.mainBundle;
-    printf("NSBundle: %s\n", bundle == nil ? "false" : "true");
-    NSLog(@"Identifier: %@", [bundle bundleIdentifier]);
-    NSLog(@"Path: %@", [bundle bundlePath]);
-    NSLog(@"URL: %@", [bundle bundleURL]);
-    
     if (!notificationsEnabled())
         printf("The bundle identifier is nil, so user notifications cannot be used. If this is the case, GLFW must not call into the UNUserNotifications framework at all!\n"); // Yeah, or do some swizzling
     
@@ -618,11 +610,18 @@ void testNotifications()
     [notificationCenter requestAuthorizationWithOptions:permissions completionHandler:handler];
     
     UNMutableNotificationContent* content = [[UNMutableNotificationContent alloc] init];
-    content.title = @"My title";
-    content.body = @"My body";
+    if (title)
+        content.title = [NSString stringWithUTF8String:title];
+    if (body)
+        content.body = [NSString stringWithUTF8String:body];
     content.categoryIdentifier = @"My category";
     content.sound = UNNotificationSound.defaultSound;
+    //content.sound = UNNotificationSound.defaultCriticalSound;
+    //content.sound = [UNNotificationSound soundNamed:@""];
+    //content.sound = [UNNotificationSound criticalSoundNamed:@""];
+    //content.sound = [UNNotificationSound criticalSoundNamed:<#(nonnull UNNotificationSoundName)#> withAudioVolume:<#(float)#>
     //content.attachments // for images and sounds
+    //content.userInfo
     
     //const UNNotificationAction
     
@@ -638,6 +637,8 @@ void testNotifications()
     // This means that on Linux, a notification cannot be mutated once the sending application quits. On MacOS, this is possible. It is however possible to reference them after the application quits, on both platforms.
     UNNotificationRequest* request = [UNNotificationRequest requestWithIdentifier:identifier content:content trigger:nil];
     
+    // TODO: is it possible to support the different triggers? GLFW clients should be able to deliver Apple push notifications that they can handle in their GLFW code. What about the other triggers, such as for a location? Do other platforms support that? May not make a whole lot of sense for desktops, but there have been attempts at porting GLFW to Android and iOS, where it may make sense. Calendar and interval triggers probably have their uses. Is this how to schedule notifications with the UN framework?
+    
     // FIXME: why is the application opened when not running, and the notification is dismissed from the notification center?
     // Because of the UNNotificationCategoryOptionCustomDismissAction in the category. How to support on Linux? NotificationClosed signal? But on MacOS, the application is opened to respond to this. What if it's not running on Linux? Even if it's opened, how will it know how to handle that specific notification? Can some userData be attached to a notification on Linux?
     
@@ -652,15 +653,19 @@ void testNotifications()
     }];
     
     // Linux does not seem to have any concept of permissions, entitlements, or of requesting authorization. These are still necessary for properly working with notifications on MacOS, so GLFW must be designed around this. The Linux implementation just responds with "everything allowed" on every request, query, etc.
-    
-    
-    
-    printf("[HERE]\n");
 }
 
-static void _glfwSendNotificationCocoa(void)
+void testNotifications()
 {
-    testNotifications();
+    swizzleBundleIdentifier();
+    
+    const NSBundle* bundle = NSBundle.mainBundle;
+    printf("NSBundle: %s\n", bundle == nil ? "false" : "true");
+    NSLog(@"Identifier: %@", [bundle bundleIdentifier]);
+    NSLog(@"Path: %@", [bundle bundlePath]);
+    NSLog(@"URL: %@", [bundle bundleURL]);
+    
+    _glfwSendNotificationCocoa("My title", "My body", "My summary");
 }
 
 

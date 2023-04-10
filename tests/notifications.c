@@ -48,6 +48,52 @@
 #include <stdlib.h>
 #include <limits.h>
 
+static char title_buffer[64] = "";
+static char body_buffer[128] = "";
+static char summary_buffer[256] = "";
+
+static bool live_edit = false;
+
+static bool title_supported = true;
+static bool body_supported = true;
+static bool summary_supported = true;
+
+static bool use_index = false;
+
+static int notification_count = 0;
+
+void sendNotification()
+{
+    if (use_index)
+    {
+        char title[sizeof(title_buffer)];
+        sprintf(title, "%d", notification_count);
+    
+        const unsigned long buffer_length = strlen(title_buffer);
+    
+        if (buffer_length > 0)
+        {
+            strcat(title, ": ");
+            strncat(title, title_buffer, buffer_length - strlen(title) - 1);
+        }
+        glfwSendNotification(title, body_buffer, summary_buffer);
+    }
+    else
+        glfwSendNotification(title_buffer, body_buffer, summary_buffer);
+    
+    ++notification_count;
+}
+
+void editLastNotification()
+{
+    
+}
+
+void retractLastNotification()
+{
+    
+}
+
 int main(int argc, char** argv)
 {
     int windowed_x, windowed_y, windowed_width, windowed_height;
@@ -62,6 +108,7 @@ int main(int argc, char** argv)
     char min_width_buffer[12] = "", min_height_buffer[12] = "";
     char max_width_buffer[12] = "", max_height_buffer[12] = "";
     int may_close = true;
+    
 
     if (!glfwInit())
         exit(EXIT_FAILURE);
@@ -123,17 +170,10 @@ int main(int argc, char** argv)
         {
             nk_layout_row_dynamic(nk, 30, 5);
 
-            if (nk_button_label(nk, "Send"))
-            {
-                glfwSendNotification();
-            }
-
-            if (nk_button_label(nk, "Maximize"))
-                glfwMaximizeWindow(window);
-            if (nk_button_label(nk, "Iconify"))
-                glfwIconifyWindow(window);
-            if (nk_button_label(nk, "Restore"))
-                glfwRestoreWindow(window);
+            if (nk_button_label(nk, "Send")) sendNotification();
+            if (nk_button_label(nk, "Edit last")) editLastNotification();
+            if (nk_button_label(nk, "Retract last")) retractLastNotification();
+            if (nk_button_label(nk, "Retract all")) printf("Is this even possible?");
             if (nk_button_label(nk, "Hide (briefly)"))
             {
                 glfwHideWindow(window);
@@ -162,70 +202,56 @@ int main(int argc, char** argv)
                                    NK_EDIT_SIG_ENTER |
                                    NK_EDIT_GOTO_END_ON_ACTIVATE;
 
-            if (position_supported)
+            if (title_supported)
             {
-                int xpos, ypos;
-                glfwGetWindowPos(window, &xpos, &ypos);
-
                 nk_layout_row_dynamic(nk, 30, 3);
-                nk_label(nk, "Position", NK_TEXT_LEFT);
+                nk_label(nk, "Title", NK_TEXT_LEFT);
 
-                events = nk_edit_string_zero_terminated(nk, flags, xpos_buffer,
-                                                        sizeof(xpos_buffer),
-                                                        nk_filter_decimal);
-                if (events & NK_EDIT_COMMITED)
+                events = nk_edit_string_zero_terminated(nk, flags, title_buffer,
+                                                        sizeof(title_buffer),
+                                                        nk_filter_default);
+                if (live_edit && events & NK_EDIT_COMMITED)
                 {
-                    xpos = atoi(xpos_buffer);
-                    glfwSetWindowPos(window, xpos, ypos);
+                    
                 }
-                else if (xpos != last_xpos || (events & NK_EDIT_DEACTIVATED))
-                    sprintf(xpos_buffer, "%i", xpos);
-
-                events = nk_edit_string_zero_terminated(nk, flags, ypos_buffer,
-                                                        sizeof(ypos_buffer),
-                                                        nk_filter_decimal);
-                if (events & NK_EDIT_COMMITED)
-                {
-                    ypos = atoi(ypos_buffer);
-                    glfwSetWindowPos(window, xpos, ypos);
-                }
-                else if (ypos != last_ypos || (events & NK_EDIT_DEACTIVATED))
-                    sprintf(ypos_buffer, "%i", ypos);
-
-                last_xpos = xpos;
-                last_ypos = ypos;
             }
             else
-                nk_label(nk, "Position not supported", NK_TEXT_LEFT);
-
-            nk_layout_row_dynamic(nk, 30, 3);
-            nk_label(nk, "Size", NK_TEXT_LEFT);
-
-            events = nk_edit_string_zero_terminated(nk, flags, width_buffer,
-                                                    sizeof(width_buffer),
-                                                    nk_filter_decimal);
-            if (events & NK_EDIT_COMMITED)
+                nk_label(nk, "Title not supported", NK_TEXT_LEFT);
+        
+            if (body_supported)
             {
-                width = atoi(width_buffer);
-                glfwSetWindowSize(window, width, height);
-            }
-            else if (width != last_width || (events & NK_EDIT_DEACTIVATED))
-                sprintf(width_buffer, "%i", width);
+                nk_layout_row_dynamic(nk, 30, 3);
+                nk_label(nk, "Body", NK_TEXT_LEFT);
 
-            events = nk_edit_string_zero_terminated(nk, flags, height_buffer,
-                                                    sizeof(height_buffer),
-                                                    nk_filter_decimal);
-            if (events & NK_EDIT_COMMITED)
+                events = nk_edit_string_zero_terminated(nk, flags, body_buffer,
+                                                        sizeof(body_buffer),
+                                                        nk_filter_default);
+            
+                if (live_edit && events & NK_EDIT_COMMITED)
+                {
+                    
+                }
+            }
+            else
+                nk_label(nk, "Body not supported", NK_TEXT_LEFT);
+
+            if (summary_supported)
             {
-                height = atoi(height_buffer);
-                glfwSetWindowSize(window, width, height);
+                nk_layout_row_dynamic(nk, 30, 3);
+                nk_label(nk, "Body", NK_TEXT_LEFT);
+
+                events = nk_edit_string_zero_terminated(nk, flags, summary_buffer,
+                                                        sizeof(summary_buffer),
+                                                        nk_filter_default);
+            
+                if (live_edit && events & NK_EDIT_COMMITED)
+                {
+                    
+                }
             }
-            else if (height != last_height || (events & NK_EDIT_DEACTIVATED))
-                sprintf(height_buffer, "%i", height);
-
-            last_width = width;
-            last_height = height;
-
+            else
+                nk_label(nk, "Summary not supported", NK_TEXT_LEFT);
+        
             bool update_ratio_limit = false;
             if (nk_checkbox_label(nk, "Aspect Ratio", &limit_aspect_ratio))
                 update_ratio_limit = true;
@@ -372,8 +398,7 @@ int main(int argc, char** argv)
             nk_layout_row_dynamic(nk, 30, width > 200 ? width / 200 : 1);
 
             int decorated = glfwGetWindowAttrib(window, GLFW_DECORATED);
-            if (nk_checkbox_label(nk, "Decorated", &decorated))
-                glfwSetWindowAttrib(window, GLFW_DECORATED, decorated);
+            nk_checkbox_label(nk, "Use index", &use_index);
 
             int resizable = glfwGetWindowAttrib(window, GLFW_RESIZABLE);
             if (nk_checkbox_label(nk, "Resizable", &resizable))
