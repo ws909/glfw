@@ -622,6 +622,9 @@ void testNotifications()
     content.body = @"My body";
     content.categoryIdentifier = @"My category";
     content.sound = UNNotificationSound.defaultSound;
+    //content.attachments // for images and sounds
+    
+    //const UNNotificationAction
     
     const UNNotificationCategory* category = [UNNotificationCategory categoryWithIdentifier:@"My category"
                                                                                     actions:[NSArray array]
@@ -630,16 +633,27 @@ void testNotifications()
                                                                       categorySummaryFormat:@"My summary format"
                                                                                     options:UNNotificationCategoryOptionCustomDismissAction];
     
-    UNNotificationRequest* request = [UNNotificationRequest requestWithIdentifier:@"My identifier" content:content trigger:nil];
+    NSString* identifier = [[NSUUID UUID] UUIDString]; // Multiple requests for the same notification may be made. A notification's identity is specified by the identifier. This corresponds to the replaces_id on Linux. On MacOS, an identifier can be specified prior to delivery. This is not possible on Linux. If this is important to preserve, it may be possible to emulate it on Linux, by uniquely identifying it with a structure that has a uint32_t value. If set to 0, it means the notification hasn't been sent yet. But it's not this value that's used for identification. Instead, the structure's address is, or another member value.
+    // What this means, is that on MacOS, a notification can be identified between program executions. On Linux, they can not be.
+    // This means that on Linux, a notification cannot be mutated once the sending application quits. On MacOS, this is possible. It is however possible to reference them after the application quits, on both platforms.
+    UNNotificationRequest* request = [UNNotificationRequest requestWithIdentifier:identifier content:content trigger:nil];
     
     // FIXME: why is the application opened when not running, and the notification is dismissed from the notification center?
+    // Because of the UNNotificationCategoryOptionCustomDismissAction in the category. How to support on Linux? NotificationClosed signal? But on MacOS, the application is opened to respond to this. What if it's not running on Linux? Even if it's opened, how will it know how to handle that specific notification? Can some userData be attached to a notification on Linux?
     
-    [notificationCenter setNotificationCategories:[NSSet setWithObject:category]]; // Only call in glfwInit (or similar glfwInitNotifications), and in glfwTerminate.
+    // FIXME: why is the application opened when not running, and the notification is clicked on in notification center?
+    // Seems to be default behaviour for all applications. How to properly respond in the context of GLFW applications? Delegate? Any parameters given to it? Such as which notification opened it? Does that mean callbacks must be set prior to glfwInit?
+    
+    [notificationCenter setNotificationCategories:[NSSet setWithObject:category]]; // Only call in glfwInit (or similar glfwInitNotifications), and in glfwTerminate. // Oh, if the application's language ever changes, they might want to update the localized strings in the categories.
     [notificationCenter addNotificationRequest:request withCompletionHandler:^(NSError* error) {
         if (error != nil) {
             NSLog(@"Request error = %@", error);
         }
     }];
+    
+    // Linux does not seem to have any concept of permissions, entitlements, or of requesting authorization. These are still necessary for properly working with notifications on MacOS, so GLFW must be designed around this. The Linux implementation just responds with "everything allowed" on every request, query, etc.
+    
+    
     
     printf("[HERE]\n");
 }

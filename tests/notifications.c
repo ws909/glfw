@@ -410,3 +410,88 @@ int main(int argc, char** argv)
     glfwTerminate();
     exit(EXIT_SUCCESS);
 }
+
+
+// Support:
+//
+// Explicit permission/authorization handling
+//
+// Explicit category:
+//    Action
+//    
+// Notification
+//    Swap content
+//    Standard or custom sound
+//    Urgency
+//
+// Notification content
+//    Title
+//    Body
+//    Summary
+//
+//    MacOS: use all 3
+//    Linux: [title, body/summary] => summary: [0], body: [1]. [Body, summary] => summary: [0], body: [1]. [Title] => summary.
+
+
+// So on Linux, listen for DBus signals in glfwPollEvents/glfwWaitEvents? Make no guarantees of which thread calls callbacks, so that MacOS is safely supported too?
+
+// https://specifications.freedesktop.org/notification-spec/latest/ar01s08.html
+// TODO: use the following hints: "urgency": uint8, "category": str, "desktop-entry": str, "image-data": iiibiiay, "sound-file": str, "sound-name": str, "suppress-sound": bool (and maybe "x-glfw-version": str?)
+// See the server capabilities
+
+// https://specifications.freedesktop.org/notification-spec/latest/ar01s06.html for "category" hint.
+// The "category" hint should perhaps not be related to the MacOS category.
+
+// "urgency" hint
+enum org_freedesktop_Notifications_UrgencyLevel {
+    LOW = 0,
+    NORMAL = 1,
+    CRITICAL = 2
+};
+
+enum org_freedesktop_Notifications_ClosedReason {
+    EXPIRED = 1,
+    DISMISSED = 2,
+    CLOSED = 3,
+    UNDEFINED = 4
+};
+
+void org_freedesktop_Notifications_GetCapabilities(const char** array, int* count);
+
+// returns error code
+uint32_t org_freedesktop_Notifications_Notify(const char* app_name,
+                                              uint32_t replaces_id,
+                                              const char* app_icon,
+                                              const char* summary,
+                                              const char* body,
+                                              const char** actions, int actions_count,
+                                              const char** hints, int hints_count, // FIXME: hints signature
+                                              int32_t expire_timeout); // milliseconds after display. 0: never. -1: server default
+
+
+void org_freedesktop_Notifications_NotificationClosed(uint32_t id, enum org_freedesktop_Notifications_ClosedReason reason) {
+    
+}
+
+// TODO: What's the best design here? Pass a lambda (function pointer) to GLFW for a notification category's action, which GLFW automatically generates a string for, and adds to a dictionary in _glfw?
+void org_freedesktop_Notifications_ActionInvoked(uint32_t id, const char* action_key) {
+    
+}
+
+void org_freedesktop_Notifications_ActivationToken(uint32_t id, const char* activation_token) {
+    
+}
+
+void signalHandler(const char* signalName) {
+    if (strcmp(signalName, "NotificationClosed")) {
+        org_freedesktop_Notifications_NotificationClosed(-1, -1);
+        return;
+    }
+    if (strcmp(signalName, "ActionInvoked")) {
+        org_freedesktop_Notifications_ActionInvoked(-1, -1);
+        return;
+    }
+    if (strcmp(signalName, "ActivationToken")) {
+        org_freedesktop_Notifications_ActivationToken(-1, -1);
+    }
+}
