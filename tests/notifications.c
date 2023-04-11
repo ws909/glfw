@@ -398,7 +398,7 @@ int main(int argc, char** argv)
             nk_layout_row_dynamic(nk, 30, width > 200 ? width / 200 : 1);
 
             int decorated = glfwGetWindowAttrib(window, GLFW_DECORATED);
-            nk_checkbox_label(nk, "Use index", &use_index);
+            nk_checkbox_label(nk, "Use index", (int*) &use_index);
 
             int resizable = glfwGetWindowAttrib(window, GLFW_RESIZABLE);
             if (nk_checkbox_label(nk, "Resizable", &resizable))
@@ -441,22 +441,25 @@ int main(int argc, char** argv)
 //
 // Explicit permission/authorization handling
 //
-// Explicit category:
+// Explicit category/kind/type:
 //    Action
 //    
 // Notification
 //    Swap content
 //    Standard or custom sound
 //    Urgency
+//    Retract
 //
 // Notification content
 //    Title
-//    Body
 //    Summary
+//    Body
 //
 //    MacOS: use all 3
-//    Linux: [title, body/summary] => summary: [0], body: [1]. [Body, summary] => summary: [0], body: [1]. [Title] => summary.
+//    Linux: [title, summary/body] => summary: [0], body: [1]. [summary, body] => summary: [0], body: [1]. [title] => summary.
 
+// Perhaps an opaque NotificationCategory? glfwCreateNotificationCategory(const char* name, actions, etc)
+// Providing a category name should probably be optional, as GLFW can auto-generate one (only MacOS needs one), and the user only needs to specify it if they ever use other MacOS specific features. 
 
 // So on Linux, listen for DBus signals in glfwPollEvents/glfwWaitEvents? Make no guarantees of which thread calls callbacks, so that MacOS is safely supported too?
 
@@ -481,12 +484,35 @@ enum org_freedesktop_Notifications_ClosedReason {
     UNDEFINED = 4
 };
 
+struct iiibiiay_image {
+    int width;
+    int height;
+    int rowstride;
+    bool has_alpha;
+    int bits_per_sample;
+    int channels;
+    void* data;
+};
+
+void glfwImageToIIIBIIAY(const GLFWimage* src, struct iiibiiay_image* dst)
+{
+    dst->width = src->width;
+    dst->height = src->height;
+    dst->rowstride = src->width * 4;
+    dst->has_alpha = true;
+    dst->bits_per_sample = 32;
+    dst->channels = 4;
+    dst->data = src->pixels;
+}
+
 void org_freedesktop_Notifications_GetCapabilities(const char** array, int* count);
 
-// returns error code
+// From spec: The "app_icon" parameter and "image-path" hint should be either an URI (file:// is the only URI schema supported right now) or a name in a freedesktop.org-compliant icon theme (not a GTK+ stock ID).
+
+// returns the ID of the posted notification
 uint32_t org_freedesktop_Notifications_Notify(const char* app_name,
                                               uint32_t replaces_id,
-                                              const char* app_icon,
+                                              const char* app_icon, // Not user-specified
                                               const char* summary,
                                               const char* body,
                                               const char** actions, int actions_count,
@@ -494,11 +520,22 @@ uint32_t org_freedesktop_Notifications_Notify(const char* app_name,
                                               int32_t expire_timeout); // milliseconds after display. 0: never. -1: server default
 
 
+
+
+// Use for retracting a notification.
+void org_freedesktop_Notifications_CloseNotification(uint32_t id);
+
 void org_freedesktop_Notifications_NotificationClosed(uint32_t id, enum org_freedesktop_Notifications_ClosedReason reason) {
     
 }
 
 // TODO: What's the best design here? Pass a lambda (function pointer) to GLFW for a notification category's action, which GLFW automatically generates a string for, and adds to a dictionary in _glfw?
+// MacOS actually has the exact same design, in that the delegate gets the action identifier.
+// MacOS gets more than just the identifier for the action (action_key) and notification (id), though: it also gets the notification itself, including the content, userInfo, and more.
+// The ID/identifier is useless by itself, so either GLFW or the client must map it to user-specified data.
+// On MacOS, all this data persists between application lifetimes. On Linux, they don't, unless the client stores them on the disk. Doing that is outside the scope of Linux. Doing it on MacOS because GLFW doesn't expose it, is stupid overhead.
+// Maybe pass that data to the client's callback as nullable data? So guarantee it's always present if the application didn't shut down beforehand? That way, if a client depends on notification data for their callback, and this must be available after a shutdown, they must store this on the on the disk themselves. Should provide some kind of query method to check if the platform supports it, so MacOS can report yes, and Linux reports no.
+// A chat application is a good example of one 
 void org_freedesktop_Notifications_ActionInvoked(uint32_t id, const char* action_key) {
     
 }

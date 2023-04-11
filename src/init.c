@@ -549,12 +549,12 @@ GLFWAPI GLFWerrorfun glfwSetErrorCallback(GLFWerrorfun cbfun)
     return cbfun;
 }
 
-GLFWAPI void glfwSendNotification(const char* title, const char* body, const char* summary)
+GLFWAPI void glfwSendNotification(const char* title, const char* summary, const char* body)
 {
     // TODO: check init state
     
     // summary ignored for now, because the MacOS implementation doesn't use it.
     // On MacOS, a notification is not delivered if one of these strings are NULL or unset.
-    assert((title ? strlen(title) : 0) + (body ? strlen(body) : 0) + (summary ? strlen(summary) : 0) > 0);
+    assert((title ? strlen(title) : 0) + (summary ? strlen(summary) : 0) + (body ? strlen(body) : 0) > 0);
     _glfw.platform.sendNotification(title, body, summary);
 }

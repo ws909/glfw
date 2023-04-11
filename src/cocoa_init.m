@@ -549,6 +549,7 @@ static GLFWbool notificationsEnabled()
 
 @end
 
+// You must assign your delegate object to the UNUserNotificationCenter object before your app finishes launching. For example, in an iOS app, you must assign it in the application:willFinishLaunchingWithOptions: or application:didFinishLaunchingWithOptions: method of your app delegate. Assigning a delegate after the system calls these methods might cause you to miss incoming notifications.
 @implementation NotificationsDelegate
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
@@ -560,9 +561,25 @@ static GLFWbool notificationsEnabled()
                       UNNotificationPresentationOptionSound |
                       UNNotificationPresentationOptionBanner);
 }
+
+- (void)userNotificationCenter:(UNUserNotificationCenter *)center
+didReceiveNotificationResponse:(UNNotificationResponse *)response
+         withCompletionHandler:(void (^)(void))completionHandler
+{
+    NSLog(@"action chosen: %@\n", response.actionIdentifier);
+    // response.notification.date
+    // response.notification.request
+    
+    // Same as replaces_id on Linux
+    NSLog(@"Request identifier: %@\n\n", response.notification.request.identifier);
+    
+    // response.notification.request.content.userInfo
+}
+
+
 @end
 
-static void _glfwSendNotificationCocoa(const char* title, const char* body, const char* summary)
+static void _glfwSendNotificationCocoa(const char* title, const char* summary, const char* body)
 {
     if (!notificationsEnabled())
         printf("The bundle identifier is nil, so user notifications cannot be used. If this is the case, GLFW must not call into the UNUserNotifications framework at all!\n"); // Yeah, or do some swizzling
@@ -616,6 +633,9 @@ static void _glfwSendNotificationCocoa(const char* title, const char* body, cons
         content.body = [NSString stringWithUTF8String:body];
     content.categoryIdentifier = @"My category";
     content.sound = UNNotificationSound.defaultSound;
+    //content.threadIdentifier
+    //content.interruptionLevel // similar to Linux's urgency
+    //content.relevanceScore
     //content.sound = UNNotificationSound.defaultCriticalSound;
     //content.sound = [UNNotificationSound soundNamed:@""];
     //content.sound = [UNNotificationSound criticalSoundNamed:@""];
@@ -623,10 +643,24 @@ static void _glfwSendNotificationCocoa(const char* title, const char* body, cons
     //content.attachments // for images and sounds
     //content.userInfo
     
-    //const UNNotificationAction
+    
+    UNNotificationInterruptionLevelPassive; // Linux: LOW
+    UNNotificationInterruptionLevelActive; // Linux: NORMAL
+    UNNotificationInterruptionLevelTimeSensitive; // Linux: NORMAL
+    UNNotificationInterruptionLevelCritical; // LINUX: CRITICAL
+    
+    UNNotificationActionOptionNone;
+    UNNotificationActionOptionForeground;
+    UNNotificationActionOptionDestructive;
+    UNNotificationActionOptionAuthenticationRequired;
+    
+    UNNotificationActionIcon* actionIcon = [UNNotificationActionIcon iconWithSystemImageName:@"square.and.arrow.up"];
+    
+    const UNNotificationAction* action1 = [UNNotificationAction actionWithIdentifier:@"A1" title:@"A1T" options:UNNotificationActionOptionNone];
+    const UNNotificationAction* action2 = [UNNotificationAction actionWithIdentifier:@"A2" title:@"A2T" options:UNNotificationActionOptionNone icon:actionIcon]; // This icon doesn't seem to work.
     
     const UNNotificationCategory* category = [UNNotificationCategory categoryWithIdentifier:@"My category"
-                                                                                    actions:[NSArray array]
+                                                                                    actions:[NSArray arrayWithObjects:action2, nil]
                                                                           intentIdentifiers:[NSArray array]
                                                               hiddenPreviewsBodyPlaceholder:@"My hidden body placeholder"
                                                                       categorySummaryFormat:@"My summary format"
@@ -642,11 +676,13 @@ static void _glfwSendNotificationCocoa(const char* title, const char* body, cons
     // FIXME: why is the application opened when not running, and the notification is dismissed from the notification center?
     // Because of the UNNotificationCategoryOptionCustomDismissAction in the category. How to support on Linux? NotificationClosed signal? But on MacOS, the application is opened to respond to this. What if it's not running on Linux? Even if it's opened, how will it know how to handle that specific notification? Can some userData be attached to a notification on Linux?
     
-    // FIXME: why is the application opened when not running, and the notification is clicked on in notification center?
+    // FIXME: why is the application opened when not running, and the notification is clicked on in the notification center?
     // Seems to be default behaviour for all applications. How to properly respond in the context of GLFW applications? Delegate? Any parameters given to it? Such as which notification opened it? Does that mean callbacks must be set prior to glfwInit?
     
     [notificationCenter setNotificationCategories:[NSSet setWithObject:category]]; // Only call in glfwInit (or similar glfwInitNotifications), and in glfwTerminate. // Oh, if the application's language ever changes, they might want to update the localized strings in the categories.
+    // Well, consider handling this automatically. glfwCreateNotificationCategory adds the new opaque type to an internal list (MacOS only) (synchronized), and then calls this method upon each invocation of glfwSendNotification (or similar), when this list has been changed. Volatile modificationCount variable + lastModificationCount? Or just require every notification to be dispatched from the main thread: https://stackoverflow.com/questions/17244983/dbus-multithread-processing
     [notificationCenter addNotificationRequest:request withCompletionHandler:^(NSError* error) {
+        printf("Completed now");
         if (error != nil) {
             NSLog(@"Request error = %@", error);
         }
@@ -654,6 +690,32 @@ static void _glfwSendNotificationCocoa(const char* title, const char* body, cons
     
     // Linux does not seem to have any concept of permissions, entitlements, or of requesting authorization. These are still necessary for properly working with notifications on MacOS, so GLFW must be designed around this. The Linux implementation just responds with "everything allowed" on every request, query, etc.
 }
+
+typedef struct GLFWnotificationContent GLFWnotificationContent;
+typedef struct GLFWnotificationCategory GLFWnotificationCategory;
+typedef struct GLFWnotification GLFWnotification;
+
+typedef struct _GLFWnotification {
+    struct {
+        
+    } ns;
+    
+    struct {
+        
+    } linux;
+    
+} _GLFWnotification;
+
+void glfwNotificationContentSetImages(GLFWnotificationContent* content, const GLFWimage* images, int count);
+void glfwNotificationContentSetText(GLFWnotificationContent* content, const char* title, const char* summary, const char* body);
+
+void glfwNotificationContentSetCategory(GLFWnotificationContent* content, const GLFWnotificationCategory* category);
+const GLFWnotificationCategory* glfwNotificationContentGetCategory(const GLFWnotificationContent* content);
+
+void glfwNotificationCategorySetIdentifier(GLFWnotificationContent* content, const char* identifier);
+const char* glfwNotificationCategoryGetIdentifier(const GLFWnotificationContent* content);
+
+void glfwSetNotificationCallback();
 
 void testNotifications()
 {
