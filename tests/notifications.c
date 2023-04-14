@@ -62,6 +62,8 @@ static bool use_index = false;
 
 static int notification_count = 0;
 
+static GLFWnotification* last_notification;
+
 void sendNotification()
 {
     if (use_index)
@@ -91,7 +93,7 @@ void editLastNotification()
 
 void retractLastNotification()
 {
-    
+    glfwNotificationRetract(last_notification);
 }
 
 int main(int argc, char** argv)
@@ -173,7 +175,7 @@ int main(int argc, char** argv)
             if (nk_button_label(nk, "Send")) sendNotification();
             if (nk_button_label(nk, "Edit last")) editLastNotification();
             if (nk_button_label(nk, "Retract last")) retractLastNotification();
-            if (nk_button_label(nk, "Retract all")) printf("Is this even possible?");
+            if (nk_button_label(nk, "Retract all")) glfwNotificationRetractAll();
             if (nk_button_label(nk, "Hide (briefly)"))
             {
                 glfwHideWindow(window);
@@ -470,6 +472,116 @@ int main(int argc, char** argv)
 // https://specifications.freedesktop.org/notification-spec/latest/ar01s06.html for "category" hint.
 // The "category" hint should perhaps not be related to the MacOS category.
 
+
+
+typedef struct {
+    void** elements;
+    int capacity;
+    int count;
+} _list;
+
+typedef int (*_list_comparator)(const void* key, const void* element);
+
+void _list_init(_list* list)
+{
+    list->elements = NULL;
+    list->capacity = 0;
+    list->count = 0;
+}
+
+void _list_deinit(_list* list)
+{
+    // TODO: use GLFW allocator
+    free(list->elements);
+    list->capacity = 0;
+    list->count = 0;
+}
+
+void _list_add(_list* list, void* element)
+{
+    if (list->capacity == list->count)
+    {
+        // TODO: use GLFW allocator
+        if (list->capacity == 0)
+            list->capacity = 32;
+        else
+            list->capacity = list->capacity < 1;
+            
+        void** new_list = calloc(list->capacity, sizeof(void*));
+        
+        if (list->elements != NULL)
+        {
+            memcpy(new_list, list->elements, list->count);
+            free(list->elements);
+        }
+
+        list->elements = new_list;
+    
+        list->elements[list->count++] = element;
+        return;
+    }
+    
+    for (int i = 0; i < list->capacity; ++i)
+    {
+        if (list->elements[i] == NULL)
+        {
+            list->elements[i] = element;
+            break;
+        }
+    }
+    ++list->count;
+}
+
+void* _list_remove(const _list* list, const void* key, _list_comparator comparator)
+{
+    for (int i = 0; i < list->capacity; ++i)
+    {
+        if (comparator(key, list->elements[i]))
+        {
+            void* element = list->elements[i];
+            list->elements[i] = NULL;
+            return element;
+        }
+    }
+    return NULL;
+}
+
+void* _list_find(const _list* list, const void* key, _list_comparator comparator)
+{
+    for (int i = 0; i < list->capacity; ++i)
+    {
+        if (comparator(key, list->elements[i]))
+            return list->elements[i];
+    }
+    return NULL;
+}
+
+static int notificationsComparator(const void* id, const void* notification)
+{
+    return ((_GLFWnotification*) notification)->linux.id == *((uint32_t*) id);
+}
+
+static _list retainedNotifications;
+
+// TODO: _list_init(retainedNotifications);
+// TODO: _list_deinit(retainedNotifications);
+
+void addNotification(_GLFWnotification* notification)
+{
+    _list_add(&retainedNotifications, notification);
+}
+
+_GLFWnotification* removeNotification(uint32_t id)
+{
+    return _list_remove(&retainedNotifications, &id, notificationsComparator);
+}
+
+_GLFWnotification* findNotification(uint32_t id)
+{
+    return _list_find(&retainedNotifications, &id, notificationsComparator);
+}
+
+
 // "urgency" hint
 enum org_freedesktop_Notifications_UrgencyLevel {
     LOW = 0,
@@ -523,7 +635,7 @@ uint32_t org_freedesktop_Notifications_Notify(const char* app_name,
 
 
 // Use for retracting a notification.
-void org_freedesktop_Notifications_CloseNotification(uint32_t id);
+void org_freedesktop_Notifications_CloseNotification(uint32_t id) {}
 
 void org_freedesktop_Notifications_NotificationClosed(uint32_t id, enum org_freedesktop_Notifications_ClosedReason reason) {
     
@@ -537,11 +649,22 @@ void org_freedesktop_Notifications_NotificationClosed(uint32_t id, enum org_free
 // Maybe pass that data to the client's callback as nullable data? So guarantee it's always present if the application didn't shut down beforehand? That way, if a client depends on notification data for their callback, and this must be available after a shutdown, they must store this on the on the disk themselves. Should provide some kind of query method to check if the platform supports it, so MacOS can report yes, and Linux reports no.
 // A chat application is a good example of one 
 void org_freedesktop_Notifications_ActionInvoked(uint32_t id, const char* action_key) {
+    const _GLFWnotification* notification = findNotification(id);
     
+    // A faulty server implementation can make a GLFW application with assertions enabled, crash by sending an invalid ID
+    assert(notification != NULL);
 }
 
+// Actions can be invoked with an optional activation token. This signal is always invoked before ActionInvoked
 void org_freedesktop_Notifications_ActivationToken(uint32_t id, const char* activation_token) {
+    const _GLFWnotification* notification = findNotification(id);
     
+    assert(notification != NULL);
+    
+    // Documentation for ActivationToken:
+    // The ID of the notification emitting the ActionInvoked signal.
+    //
+    // What does this mean? Something like this? Inside app A, asks for 2FA authorization. B gets signal from server, sends a notification, user taps notification, swaps to B, finishes the action, then B automatically switches back to A with the activation_token?
 }
 
 void signalHandler(const char* signalName) {
@@ -555,5 +678,23 @@ void signalHandler(const char* signalName) {
     }
     if (strcmp(signalName, "ActivationToken")) {
         org_freedesktop_Notifications_ActivationToken(-1, -1);
+    }
+}
+
+
+
+void glfwNotificationRetractLinux(GLFWnotification* handle) {
+    _GLFWnotification* notification = (_GLFWnotification*) handle;
+    assert(notification->linux.id != 0);
+    
+    org_freedesktop_Notifications_CloseNotification(notification->linux.id);
+}
+
+void glfwNotificationRetractAllLinux() {
+    for (int i = 0; i < retainedNotifications.capacity; ++i)
+    {
+        _GLFWnotification* notification = (_GLFWnotification*) retainedNotifications.elements[i];
+        if (notification != NULL)
+            org_freedesktop_Notifications_CloseNotification(notification->linux.id);
     }
 }

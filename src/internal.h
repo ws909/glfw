@@ -756,6 +756,8 @@ struct _GLFWplatform
     VkResult (*createWindowSurface)(VkInstance,_GLFWwindow*,const VkAllocationCallbacks*,VkSurfaceKHR*);
     // Notifications
     void (*sendNotification)(const char*,const char*,const char*);
+    void (*notificationRetract)(GLFWnotification*);
+    void (*notificationRetractAll)();
 };
 
 // Library global data

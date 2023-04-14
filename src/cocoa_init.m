@@ -574,6 +574,8 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
     NSLog(@"Request identifier: %@\n\n", response.notification.request.identifier);
     
     // response.notification.request.content.userInfo
+    
+    // TODO: support UNTextInputNotificationResponse (requires UNTextInputNotificationAction)
 }
 
 
@@ -691,31 +693,21 @@ static void _glfwSendNotificationCocoa(const char* title, const char* summary, c
     // Linux does not seem to have any concept of permissions, entitlements, or of requesting authorization. These are still necessary for properly working with notifications on MacOS, so GLFW must be designed around this. The Linux implementation just responds with "everything allowed" on every request, query, etc.
 }
 
-typedef struct GLFWnotificationContent GLFWnotificationContent;
-typedef struct GLFWnotificationCategory GLFWnotificationCategory;
-typedef struct GLFWnotification GLFWnotification;
-
-typedef struct _GLFWnotification {
-    struct {
-        
-    } ns;
+void glfwNotificationRetractCocoa(GLFWnotification* handle) {
+    _GLFWnotification* notification = (_GLFWnotification*) handle;
     
-    struct {
-        
-    } linux;
+    // Is this necessary to call?
+    [[UNUserNotificationCenter currentNotificationCenter] removePendingNotificationRequestsWithIdentifiers:notification->ns.identifier];
     
-} _GLFWnotification;
+    [[UNUserNotificationCenter currentNotificationCenter] removeDeliveredNotificationsWithIdentifiers:notification->ns.identifier];
+}
 
-void glfwNotificationContentSetImages(GLFWnotificationContent* content, const GLFWimage* images, int count);
-void glfwNotificationContentSetText(GLFWnotificationContent* content, const char* title, const char* summary, const char* body);
-
-void glfwNotificationContentSetCategory(GLFWnotificationContent* content, const GLFWnotificationCategory* category);
-const GLFWnotificationCategory* glfwNotificationContentGetCategory(const GLFWnotificationContent* content);
-
-void glfwNotificationCategorySetIdentifier(GLFWnotificationContent* content, const char* identifier);
-const char* glfwNotificationCategoryGetIdentifier(const GLFWnotificationContent* content);
-
-void glfwSetNotificationCallback();
+void glfwNotificationRetractAllCocoa() {
+    // Is this necessary to call?
+    [[UNUserNotificationCenter currentNotificationCenter] removeAllPendingNotificationRequests];
+    
+    [[UNUserNotificationCenter currentNotificationCenter] removeAllDeliveredNotifications];
+}
 
 void testNotifications()
 {
@@ -811,6 +803,8 @@ GLFWbool _glfwConnectCocoa(int platformID, _GLFWplatform* platform)
         _glfwGetPhysicalDevicePresentationSupportCocoa,
         _glfwCreateWindowSurfaceCocoa,
         _glfwSendNotificationCocoa,
+        glfwNotificationRetractCocoa,
+        glfwNotificationRetractAllCocoa
     };
 
     *platform = cocoa;

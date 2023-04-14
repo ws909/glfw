@@ -558,3 +558,17 @@ GLFWAPI void glfwSendNotification(const char* title, const char* summary, const 
     assert((title ? strlen(title) : 0) + (summary ? strlen(summary) : 0) + (body ? strlen(body) : 0) > 0);
     _glfw.platform.sendNotification(title, body, summary);
 }
+
+GLFWAPI void glfwNotificationRetract(GLFWnotification* notification)
+{
+    _GLFW_REQUIRE_INIT();
+    assert(notification != NULL);
+    
+    _glfw.platform.notificationRetract(notification);
+}
+
+GLFWAPI void glfwNotificationRetractAll()
+{
+    _GLFW_REQUIRE_INIT();
+    _glfw.platform.notificationRetractAll();
+}

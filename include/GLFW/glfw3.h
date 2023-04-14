@@ -6011,6 +6011,37 @@ GLFWAPI void glfwSendNotification(const char* title,
                                   const char* summary,
                                   const char* body);
 
+typedef struct GLFWnotificationContent GLFWnotificationContent;
+typedef struct GLFWnotificationCategory GLFWnotificationCategory;
+typedef struct GLFWnotification GLFWnotification;
+
+typedef struct _GLFWnotification {
+    struct {
+        void* identifier;
+    } ns;
+    
+    struct {
+        uint32_t id;
+    } linux;
+    
+} _GLFWnotification;
+
+typedef void (GLFWnotificationactionfun)(const GLFWnotification* notification, const char* actionIdentifier);
+
+void glfwNotificationContentSetImages(GLFWnotificationContent* content, const GLFWimage* images, int count);
+void glfwNotificationContentSetText(GLFWnotificationContent* content, const char* title, const char* summary, const char* body);
+
+void glfwNotificationContentSetCategory(GLFWnotificationContent* content, const GLFWnotificationCategory* category);
+const GLFWnotificationCategory* glfwNotificationContentGetCategory(const GLFWnotificationContent* content);
+
+void glfwNotificationCategorySetIdentifier(GLFWnotificationContent* content, const char* identifier);
+const char* glfwNotificationCategoryGetIdentifier(const GLFWnotificationContent* content);
+
+void glfwNotificationRetract(GLFWnotification* notification);
+void glfwNotificationRetractAll();
+
+void glfwSetNotificationCallback();
+
 /*! @brief Returns the GLFW time.
  *
  *  This function returns the current GLFW time, in seconds.  Unless the time
